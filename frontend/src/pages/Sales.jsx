@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { getSales, addSale, updateSale, deleteSale, getProducts } from "../services/api";
+import { getSales, addSale, updateSale, deleteSale, getProducts, clearSales } from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Modal from "../components/Modal";
 import "./Pages.css";
 
-// ===== CHANGE: Added clearSales import =====
-import { clearSales } from "../services/api";
 
 function Sales() {
   const [sales, setSales] = useState([]);

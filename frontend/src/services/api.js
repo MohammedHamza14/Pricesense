@@ -35,3 +35,6 @@ export const addSale    = (data)       => http.post("/add-sale/", data);
 export const updateSale = (id, data)   => http.put(`/sales/${id}/`, data);
 export const deleteSale = (id)         => http.delete(`/sales/${id}/`);
 export const clearSales = ()           => http.delete("/clear-sales/");
+
+// ── AI Predictions ─────────────────────────────────────
+export const getPredictions = ()       => http.get("/predictions/");

@@ -40,7 +40,7 @@ function ConfirmDialog({
         {message}{" "}
         {itemName && (
           <span className="confirm-dialog__name">
-            "{itemName}"
+            &ldquo;{itemName}&rdquo;
           </span>
         )}
       </p>

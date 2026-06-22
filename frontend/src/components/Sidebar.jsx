@@ -136,3 +136,11 @@ function Sidebar({ theme, toggleTheme }) {
 }
 
 export default Sidebar;
+
+{/* <nav className="sidebar__nav">
+  <Link to="/" className="sidebar__link">Dashboard</Link>
+  <Link to="/products" className="sidebar__link">Products</Link>
+  <Link to="/sales" className="sidebar__link">Sales</Link>
+  <Link to="/billing" className="sidebar__link">💳 Billing</Link>
+  <Link to="/import" className="sidebar__link">Import Data</Link>
+</nav> */}

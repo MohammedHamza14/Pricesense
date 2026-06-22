@@ -120,6 +120,14 @@ def insights(request):
             "revenue": revenue
         })
 
+    # Guard: return empty response when no products exist
+    if not product_stats:
+        return JsonResponse({
+            "best_seller": None,
+            "worst_seller": None,
+            "highest_revenue_product": None
+        })
+
     best_seller = max(
         product_stats,
         key=lambda x: x["units_sold"]
@@ -143,7 +151,7 @@ def insights(request):
 @csrf_exempt
 def recommendations(request):
 
-    recommendations = []
+    recs = []
 
     product_stats = []
 
@@ -151,10 +159,10 @@ def recommendations(request):
 
         sales = SalesRecord.objects.filter(product=product)
 
-        revenue = sum(
+        revenue = float(sum(
             sale.price * sale.quantity_sold
             for sale in sales
-        )
+        ))
 
         units_sold = sum(
             sale.quantity_sold
@@ -167,6 +175,10 @@ def recommendations(request):
             "units_sold": units_sold
         })
 
+    # Guard: return empty response when no products exist
+    if not product_stats:
+        return JsonResponse({"recommendations": []})
+
     best_product = max(
         product_stats,
         key=lambda x: x["revenue"]
@@ -176,13 +188,12 @@ def recommendations(request):
 
         if product["revenue"] < best_product["revenue"] * 0.5:
 
-            recommendations.append(
+            recs.append(
                 f"{product['product']} is generating significantly lower revenue than {best_product['product']}. Consider promotions or discounts."
             )
 
-
     return JsonResponse({
-        "recommendations": recommendations
+        "recommendations": recs
     })
 
 
@@ -455,7 +466,7 @@ def clear_products(request):
 @csrf_exempt
 def predictions(request):
     """
-    GET /api/predictions/
+    GET /api/predictions/   
     AI-powered per-product sales prediction using Linear Regression on historical sales data.
     """
     if request.method != "GET":
