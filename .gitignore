@@ -1,0 +1,41 @@
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual Environments
+venv/
+backend/pricesenseproj/venv/
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+
+# Environment variables
+.env
+
+# ==========================
+# Django
+# ==========================
+*.log
+
+# ==========================
+# Node / React
+# ==========================
+node_modules/
+
+# Build folders
+dist/
+build/
+
+# ==========================
+# VS Code
+# ==========================
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
