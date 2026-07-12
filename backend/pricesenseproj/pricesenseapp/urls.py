@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    # Existing views — DO NOT REMOVE
+    # Existing views
     upload_csv,
     dashboard,
     product_analysis,
@@ -14,8 +14,12 @@ from .views import (
     add_sale,
     sale_detail,
     clear_sales,
-    clear_products,   # <-- ADD THIS LINE
+    clear_products, 
     predictions,
+    news_fetch,
+    news_analyze,
+    news_confidence,
+    predictions_with_confidence,
 )
 
 urlpatterns = [
@@ -40,4 +44,8 @@ urlpatterns = [
     path("clear-sales/",           clear_sales),
 
     path("predictions/",           predictions),
+    path("predictions/with-confidence/",    predictions_with_confidence),
+    path("news/",                  news_fetch),
+    path("news/analyze/",          news_analyze),
+    path("news/confidence/",       news_confidence),
 ]

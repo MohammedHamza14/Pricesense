@@ -614,3 +614,267 @@ def predictions(request):
             "total_products_analyzed": 0,
             "product_predictions": []
         }, status=500)
+
+
+# ─────────────────────────────────────────────
+# NEWS FETCHING — Context-Aware Confidence (Phase 1)
+# ─────────────────────────────────────────────
+
+@csrf_exempt
+def news_fetch(request):
+    """
+    GET /api/news/
+    
+    Fetches business news headlines from multiple RSS feeds.
+    This is Phase 1 of the Context-Aware Confidence System.
+    
+    No sentiment analysis, NLP, or confidence calculation is performed here.
+    """
+    if request.method != "GET":
+        return JsonResponse({"error": "GET request required"}, status=405)
+
+    try:
+        from .services.news_service import fetch_rss_headlines
+        headlines = fetch_rss_headlines()
+        return JsonResponse(headlines, safe=False)
+    except ImportError as e:
+        return JsonResponse({
+            "error": "News service module not found",
+            "detail": str(e)
+        }, status=500)
+    except Exception as e:
+        return JsonResponse({
+            "error": "Failed to fetch news headlines",
+            "detail": str(e)
+        }, status=500)
+    
+
+# ─────────────────────────────────────────────
+# NEWS ANALYSIS — Phase 2: Sentiment + Relevance
+# ─────────────────────────────────────────────
+
+@csrf_exempt
+def news_analyze(request):
+    """
+    POST /api/news/analyze/
+
+    Request body (JSON):
+        {
+            "business_description": "We are a textile export company...",
+            "headlines": [optional — if omitted, fetches fresh from RSS]
+        }
+
+    Fetches headlines (or uses provided ones), then scores each for
+    sentiment (VADER) and relevance (MiniLM) against the business description.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "POST request required"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
+
+    business_description = (body.get("business_description") or "").strip()
+
+    if not business_description:
+        return JsonResponse({"error": "business_description is required"}, status=400)
+
+    # Get headlines — either from request or fetch fresh
+    headlines = body.get("headlines")
+
+    if not headlines:
+        # Fetch fresh from RSS
+        try:
+            from .services.news_service import fetch_rss_headlines
+            news_data = fetch_rss_headlines()
+            headlines = news_data.get("headlines", [])
+        except ImportError as e:
+            return JsonResponse({
+                "error": "News service module not found",
+                "detail": str(e)
+            }, status=500)
+        except Exception as e:
+            return JsonResponse({
+                "error": "Failed to fetch news headlines",
+                "detail": str(e)
+            }, status=500)
+
+    if not headlines:
+        return JsonResponse({
+            "error": "No headlines available for analysis"
+        }, status=400)
+
+    # Analyze headlines
+    try:
+        from .services.sentiment_service import analyze_headlines
+        result = analyze_headlines(headlines, business_description)
+        return JsonResponse(result, safe=False)
+    except ImportError as e:
+        return JsonResponse({
+            "error": "Sentiment service module not found",
+            "detail": str(e)
+        }, status=500)
+    except Exception as e:
+        return JsonResponse({
+            "error": "Analysis failed",
+            "detail": str(e)
+        }, status=500)
+    
+# ─────────────────────────────────────────────
+# NEWS CONFIDENCE — Phase 3: Confidence Score
+# ─────────────────────────────────────────────
+
+@csrf_exempt
+def news_confidence(request):
+    """
+    POST /api/news/confidence/
+
+    Request body (JSON):
+        {
+            "business_description": "We are a textile export company...",
+            "headlines": [optional — fetches fresh if omitted],
+            "historical_baseline": 0.0  [optional — defaults to 0.0]
+        }
+
+    Returns a confidence indicator (0-100) based on analyzed headlines.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "POST request required"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
+
+    business_description = (body.get("business_description") or "").strip()
+    historical_baseline = body.get("historical_baseline", 0.0)
+
+    if not business_description:
+        return JsonResponse({"error": "business_description is required"}, status=400)
+
+    # Get headlines
+    headlines = body.get("headlines")
+    if not headlines:
+        try:
+            from .services.news_service import fetch_rss_headlines
+            news_data = fetch_rss_headlines()
+            headlines = news_data.get("headlines", [])
+        except Exception as e:
+            return JsonResponse({"error": f"Failed to fetch headlines: {str(e)}"}, status=500)
+
+    if not headlines:
+        return JsonResponse({"error": "No headlines available"}, status=400)
+
+    # Analyze headlines
+    try:
+        from .services.sentiment_service import analyze_headlines
+        analyzed = analyze_headlines(headlines, business_description)
+    except Exception as e:
+        return JsonResponse({"error": f"Analysis failed: {str(e)}"}, status=500)
+
+    # Calculate confidence
+    try:
+        from .services.confidence_service import calculate_confidence
+        result = calculate_confidence(analyzed["analyzed"], historical_baseline)
+        return JsonResponse(result)
+    except Exception as e:
+        return JsonResponse({"error": f"Confidence calculation failed: {str(e)}"}, status=500)
+    
+# ─────────────────────────────────────────────
+# PREDICTIONS WITH CONFIDENCE — Phase 4
+# ─────────────────────────────────────────────
+
+@csrf_exempt
+def predictions_with_confidence(request):
+    """
+    GET /api/predictions/with-confidence/?business_description=...
+
+    Calls existing predictions logic, then adds external confidence.
+    Existing /api/predictions/ remains completely unchanged.
+    """
+    if request.method != "GET":
+        return JsonResponse({"error": "GET request required"}, status=405)
+
+    business_description = (request.GET.get("business_description") or "").strip()
+
+    # Step 1: Call existing predictions (unchanged logic)
+    try:
+        existing_response = predictions(request)
+        existing_data = json.loads(existing_response.content)
+    except Exception as e:
+        return JsonResponse({"error": f"Prediction failed: {str(e)}"}, status=500)
+
+    # Step 2: If no business description, return predictions without confidence
+    if not business_description:
+        existing_data["external_confidence"] = {
+            "confidence": 70.0,
+            "interpretation": "No business description provided. Confidence defaulting to 70%.",
+            "warning": "Provide a business description to get context-aware confidence.",
+            "baseline": 0.0,
+            "relevant_headlines_used": 0,
+            "total_headlines": 0,
+        }
+        return JsonResponse(existing_data)
+
+    # Step 3: Fetch today's headlines
+    try:
+        from .services.news_service import fetch_rss_headlines
+        news_data = fetch_rss_headlines()
+        headlines = news_data.get("headlines", [])
+    except Exception as e:
+        existing_data["external_confidence"] = {
+            "confidence": 70.0,
+            "interpretation": "Could not fetch news headlines.",
+            "warning": str(e),
+            "baseline": 0.0,
+            "relevant_headlines_used": 0,
+            "total_headlines": 0,
+        }
+        return JsonResponse(existing_data)
+
+    if not headlines:
+        existing_data["external_confidence"] = {
+            "confidence": 70.0,
+            "interpretation": "No headlines available. Assuming stable environment.",
+            "warning": None,
+            "baseline": 0.0,
+            "relevant_headlines_used": 0,
+            "total_headlines": 0,
+        }
+        return JsonResponse(existing_data)
+
+    # Step 4: Analyze headlines
+    try:
+        from .services.sentiment_service import analyze_headlines
+        analyzed = analyze_headlines(headlines, business_description)
+    except Exception as e:
+        existing_data["external_confidence"] = {
+            "confidence": 70.0,
+            "interpretation": "Headline analysis failed.",
+            "warning": str(e),
+            "baseline": 0.0,
+            "relevant_headlines_used": 0,
+            "total_headlines": 0,
+        }
+        return JsonResponse(existing_data)
+
+    # Step 5: Calculate confidence
+    try:
+        from .services.confidence_service import calculate_confidence
+        confidence_result = calculate_confidence(analyzed["analyzed"], historical_baseline=0.0)
+    except Exception as e:
+        existing_data["external_confidence"] = {
+            "confidence": 70.0,
+            "interpretation": "Confidence calculation failed.",
+            "warning": str(e),
+            "baseline": 0.0,
+            "relevant_headlines_used": 0,
+            "total_headlines": 0,
+        }
+        return JsonResponse(existing_data)
+
+    # Step 6: Attach confidence to existing response
+    existing_data["external_confidence"] = confidence_result
+
+    return JsonResponse(existing_data)

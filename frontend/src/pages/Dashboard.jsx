@@ -68,6 +68,10 @@ function Dashboard() {
   const [predictionData, setPredictionData] = useState(null);
   const [predictionLoading, setPredictionLoading] = useState(true);
   const [predictionError, setPredictionError] = useState(false);
+  const [businessDescription, setBusinessDescription] = useState("");
+  const [businessSubmitted, setBusinessSubmitted] = useState(false);
+  const [externalConfidence, setExternalConfidence] = useState(null);
+  const [confidenceLoading, setConfidenceLoading] = useState(false);
 
   useEffect(() => {
     axios
@@ -94,6 +98,27 @@ function Dashboard() {
       setPredictionLoading(false);
     });
 }, []);
+
+useEffect(() => {
+  if (!businessDescription.trim()) {
+    setExternalConfidence(null);
+    return;
+  }
+
+  setConfidenceLoading(true);
+
+  axios
+    .get(`http://127.0.0.1:8000/api/predictions/with-confidence/?business_description=${encodeURIComponent(businessDescription)}`)
+    .then((res) => {
+      setExternalConfidence(res.data.external_confidence);
+      setConfidenceLoading(false);
+    })
+    .catch((err) => {
+      console.error("External confidence failed:", err);
+      setExternalConfidence(null);
+      setConfidenceLoading(false);
+    });
+}, [businessSubmitted]);
 
   /* ── Loading screen ── */
   if (loading) {
@@ -158,6 +183,88 @@ function Dashboard() {
         </p>
       </header>
 
+            {/* ── SECTION: BUSINESS CONTEXT ── */}
+      <section className="section">
+        <SectionLabel tag="[ CONTEXT ]" title="Business Description" />
+        <div className="card business-context-card">
+          <p className="business-context-card__help">
+            Describe your business to get context-aware confidence scores. 
+            News headlines will be analyzed for relevance to your business.
+          </p>
+          <input
+            type="text"
+            className="business-context-input"
+            placeholder="e.g., We are a textile export company dealing in cotton garments..."
+            value={businessDescription}
+            onChange={(e) => setBusinessDescription(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && businessDescription.trim()) {
+                e.target.blur();
+                setBusinessSubmitted(true);
+              }
+            }}
+          />
+          {businessSubmitted && (
+            <div className="business-context-success">
+              ✓ Context accepted
+            </div>
+          )}
+        </div>
+      </section>  
+      
+      {/* ── EXTERNAL CONFIDENCE (NEW) ── */}
+      {businessSubmitted && (
+        <div className="card ai-forecast-card ai-forecast-card--confidence">
+          <div className="ai-forecast-card__header">
+            <span className="ai-forecast-card__icon">🌐</span>
+            <span className="ai-forecast-card__title">External Confidence</span>
+          </div>
+          
+          {confidenceLoading ? (
+            <div className="ai-forecast-card__loader">
+              <span className="ai-forecast-card__loader-text">Analyzing news headlines...</span>
+            </div>
+          ) : externalConfidence ? (
+            <>
+              <div className={`confidence-badge confidence-badge--${
+                externalConfidence.confidence >= 75 ? 'high' :
+                externalConfidence.confidence >= 50 ? 'moderate' :
+                externalConfidence.confidence >= 25 ? 'low' : 'very-low'
+              }`}>
+                <span className="confidence-badge__score">{externalConfidence.confidence}%</span>
+                <span className="confidence-badge__label">{externalConfidence.interpretation}</span>
+              </div>
+              
+              <div className="confidence-details">
+                <div className="confidence-details__item">
+                  <span className="confidence-details__label">Relevant Headlines</span>
+                  <span className="confidence-details__value">{externalConfidence.relevant_headlines_used} of {externalConfidence.total_headlines}</span>
+                </div>
+                <div className="confidence-details__item">
+                  <span className="confidence-details__label">Avg Sentiment</span>
+                  <span className={`confidence-details__value ${
+                    externalConfidence.avg_sentiment > 0.1 ? 'confidence-details__value--positive' :
+                    externalConfidence.avg_sentiment < -0.1 ? 'confidence-details__value--negative' : ''
+                  }`}>
+                    {externalConfidence.avg_sentiment > 0 ? '+' : ''}{externalConfidence.avg_sentiment.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+              
+              {externalConfidence.warning && (
+                <div className="confidence-warning">
+                  ⚠️ {externalConfidence.warning}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="ai-forecast-card__message">
+              Unable to calculate external confidence.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* ── SECTION 1: KPI CARDS ── */}
       <section className="section">
         <SectionLabel tag="[ INTEL ]" title="Field Report" />
@@ -206,6 +313,7 @@ function Dashboard() {
           />
         </div>
       </section>
+     
                   {/* ── SECTION: AI FORECAST ── */}
       <section className="section">
         <SectionLabel tag="[ AI CORE ]" title="Sales Forecast" />
@@ -246,7 +354,7 @@ function Dashboard() {
               </div>
             )}
           </div>
-        ) : (
+        ) : businessSubmitted ? (
           <div className="ai-forecast-products">
             <div className="ai-forecast-summary">
               <span className="ai-forecast-summary__icon">🎯</span>
@@ -335,8 +443,19 @@ function Dashboard() {
               </div>
             )}
           </div>
+        ) : (
+          <div className="card ai-forecast-card ai-forecast-card--waiting">
+            <div className="ai-forecast-card__header">
+              <span className="ai-forecast-card__icon">🔒</span>
+              <span className="ai-forecast-card__title">Awaiting Context</span>
+            </div>
+            <p className="ai-forecast-card__message">
+              Enter your business description above and press ENTER to unlock predictions.
+            </p>
+          </div>
         )}
       </section>
+              
       {/* ── SECTION 2: INSIGHT CARDS ── */}
       <section className="section">
         <SectionLabel tag="[ ANALYTICS ]" title="Business Insights" />
