@@ -72,15 +72,28 @@ TEMPLATES = [
 WSGI_APPLICATION = 'pricesenseproj.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+import os
+import shutil
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.environ.get('VERCEL'):
+    tmp_db = '/tmp/db.sqlite3'
+    if not os.path.exists(tmp_db):
+        orig_db = BASE_DIR / 'db.sqlite3'
+        if os.path.exists(orig_db):
+            shutil.copyfile(orig_db, tmp_db)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': tmp_db,
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
