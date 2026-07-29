@@ -6,8 +6,10 @@
 
 import axios from "axios";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
+
 const http = axios.create({
-  baseURL: "http://127.0.0.1:8000/api",
+  baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -19,7 +21,7 @@ export const getRecommendations  = ()          => http.get("/recommendations/");
 
 // ── CSV Upload ─────────────────────────────────────────
 export const uploadCSV = (formData) =>
-  axios.post("http://127.0.0.1:8000/api/upload-csv/", formData);
+  axios.post(`${API_BASE_URL}/upload-csv/`, formData);
 // NOTE: uses raw axios (not http instance) to preserve multipart/form-data header
 
 // ── Products ───────────────────────────────────────────
